@@ -36,10 +36,10 @@ void FourWheelOmniControl() {
 
   // モーターに速度を指令 (速度は-255~255の範囲で指定)
   
-  // motorLF.setSpeed(front_left_speed);
-  // motorRF.setSpeed(front_right_speed);
-  // motorLB.setSpeed(rear_left_speed);
-  // motorRB.setSpeed(rear_right_speed);
+  motorLF.setSpeed(front_left_speed);
+  motorRF.setSpeed(front_right_speed);
+  motorLB.setSpeed(rear_left_speed);
+  motorRB.setSpeed(rear_right_speed);
 
   Serial.println("front_right_speed: " + String(front_right_speed));
   Serial.println("front_left_speed: " + String(front_left_speed));
