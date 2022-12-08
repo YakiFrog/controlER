@@ -12,9 +12,9 @@
  AN2: AnalogSignal(Speed:PWM) for motor RIGHT 回転速度
 */
 
-double sin_45 = sin((0.25)*M_PI);
-double cos_45 = cos((0.25)*M_PI);
-double length = 0.4; // ロボットの車輪間距離(m)
+float sin_45 = 0.7071;
+float cos_45 = 0.7071;
+double length = 0.5; // ロボットの車輪間距離(m)
 double rad_sec = 0; // 角速度(rad/s)
 
 // モータのインスタンス化 (モータのピン番号を指定)
@@ -26,11 +26,25 @@ CytronMD motorRB(PWM_DIR, 12, 13);
 // 4輪オムニの制御関数
 void FourWheelOmniControl() {
   // PS4コントローラからの入力を取得
-  double lstick_x = PS4.LStickX(); // 左スティックのX軸
-  double lstick_y = PS4.LStickY(); // 左スティックのY軸
+  double lstick_x = PS4.LStickX(); // 左スティックのX軸 -127~127
+  double lstick_y = PS4.LStickY(); // 左スティックのY軸 -127~127
+  // ドリフトを考慮して，0-5の誤差を許容
+  if (lstick_x > -5 && lstick_x < 5) {
+    lstick_x = 0;
+  }
+  if (lstick_y > -5 && lstick_y < 5) {
+    lstick_y = 0;
+  }
+
+  // -127~127の範囲を-1.5~1.5に変換
+  lstick_x = lstick_x / 85.333;
+  lstick_y = lstick_y / 85.333;
+
+  Serial.println("lstick_x: " + String(lstick_x));
+  Serial.println("lstick_y: " + String(lstick_y));
 
   double front_right_speed = - lstick_x*sin_45 + lstick_y*cos_45 + rad_sec*length;
-  double front_left_speed = - lstick_x*cos_45 - lstick_y*cos_45 + rad_sec*length;
+  double front_left_speed = - lstick_x*cos_45 - lstick_y*sin_45 + rad_sec*length;
   double rear_left_speed = lstick_x*sin_45 - lstick_y*cos_45 + rad_sec*length;
   double rear_right_speed = lstick_x*cos_45 + lstick_y*sin_45 + rad_sec*length;
 
@@ -41,10 +55,10 @@ void FourWheelOmniControl() {
   motorLB.setSpeed(rear_left_speed);
   motorRB.setSpeed(rear_right_speed);
 
-  Serial.println("front_right_speed: " + String(front_right_speed));
-  Serial.println("front_left_speed: " + String(front_left_speed));
-  Serial.println("rear_left_speed: " + String(rear_left_speed));
-  Serial.println("rear_right_speed: " + String(rear_right_speed));
+  Serial.println("front_right_speed: " + String(front_right_speed) + "[m/s]");
+  Serial.println("front_left_speed: " + String(front_left_speed) + "[m/s]");
+  Serial.println("rear_left_speed: " + String(rear_left_speed) + "[m/s]");
+  Serial.println("rear_right_speed: " + String(rear_right_speed) + "[m/s]");
   Serial.println();
 }
 
@@ -52,7 +66,7 @@ void setup() {
   Serial.begin(115200);
   pinMode(LED_PIN, OUTPUT);
   // PS4コントローラの初期化
-  PS4.begin("60:8C:4A:71:05:E2"); // 白のコントローラ
+  PS4.begin("60:8C:4A:71:05:E2"); 
   Serial.println("Ready.");
   while (!PS4.isConnected()) {}
   Serial.println("Connected.");
