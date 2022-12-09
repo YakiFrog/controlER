@@ -16,6 +16,7 @@ float sin_45 = 0.7071;
 float cos_45 = 0.7071;
 double length = 0.5; // ロボットの車輪間距離(m)
 double rad_sec = 0; // 角速度(rad/s)
+int n = 100; // 速度の倍率
 
 // モータのインスタンス化 (モータのピン番号を指定)
 CytronMD motorLF(PWM_DIR, 32, 33);  // PWM: Analog, DIR: Digital
@@ -28,6 +29,7 @@ void FourWheelOmniControl() {
   // PS4コントローラからの入力を取得
   double lstick_x = PS4.LStickX(); // 左スティックのX軸 -127~127
   double lstick_y = PS4.LStickY(); // 左スティックのY軸 -127~127
+
   // ドリフトを考慮して，0-5の誤差を許容
   if (lstick_x > -5 && lstick_x < 5) {
     lstick_x = 0;
@@ -36,24 +38,24 @@ void FourWheelOmniControl() {
     lstick_y = 0;
   }
 
-  // -127~127の範囲を-1.5~1.5に変換
+  // -127~127の範囲を-1.5~1.5に変換 (1.5は最大速度[m/s])
   lstick_x = lstick_x / 85.333;
   lstick_y = lstick_y / 85.333;
 
   Serial.println("lstick_x: " + String(lstick_x));
   Serial.println("lstick_y: " + String(lstick_y));
 
-  double front_right_speed = - lstick_x*sin_45 + lstick_y*cos_45 + rad_sec*length;
-  double front_left_speed = - lstick_x*cos_45 - lstick_y*sin_45 + rad_sec*length;
-  double rear_left_speed = lstick_x*sin_45 - lstick_y*cos_45 + rad_sec*length;
+  // モータの速度を計算
+  double front_right_speed = lstick_x*(-sin_45) + lstick_y*cos_45 + rad_sec*length;
+  double front_left_speed = stick_x*(-cos_45) + lstick_y*(-sin_45) + rad_sec*length;
+  double rear_left_speed = lstick_x*sin_45 + lstick_y*(-cos_45) + rad_sec*length;
   double rear_right_speed = lstick_x*cos_45 + lstick_y*sin_45 + rad_sec*length;
 
   // モーターに速度を指令 (速度は-255~255の範囲で指定)
-  
-  motorLF.setSpeed(front_left_speed);
-  motorRF.setSpeed(front_right_speed);
-  motorLB.setSpeed(rear_left_speed);
-  motorRB.setSpeed(rear_right_speed);
+  motorLF.setSpeed(int(front_left_speed * n)); 
+  motorRF.setSpeed(int(front_right_speed * n));
+  motorLB.setSpeed(int(rear_left_speed * n));
+  motorRB.setSpeed(int(rear_right_speed * n));
 
   Serial.println("front_right_speed: " + String(front_right_speed) + "[m/s]");
   Serial.println("front_left_speed: " + String(front_left_speed) + "[m/s]");
