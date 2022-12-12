@@ -1,5 +1,7 @@
 #include "CytronMotorDriver.h"
 
+
+// インスタンス化
 CytronMD::CytronMD(MODE mode, uint8_t pin1, uint8_t pin2)
 {
   _mode = mode;
@@ -13,6 +15,7 @@ CytronMD::CytronMD(MODE mode, uint8_t pin1, uint8_t pin2)
   digitalWrite(_pin2, LOW);
 }
 
+// モータのスピードと，方向を決める関数
 void CytronMD::setSpeed(int16_t speed)
 {
   // Make sure the speed is within the limit.
@@ -25,12 +28,12 @@ void CytronMD::setSpeed(int16_t speed)
   // Set the speed and direction.
   switch (_mode) {
     case PWM_DIR:
-      if (speed >= 0) {
-        analogWrite(_pin1, speed);
-        digitalWrite(_pin2, LOW);
+      if (speed >= 0) { // speedが正の場合
+        analogWrite(_pin1, speed); // PWM
+        digitalWrite(_pin2, LOW); // DIR
       } else {
-        analogWrite(_pin1, -speed);
-        digitalWrite(_pin2, HIGH);
+        analogWrite(_pin1, -speed); // PWM
+        digitalWrite(_pin2, HIGH); // DIR
       }
       break;
       

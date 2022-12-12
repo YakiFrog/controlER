@@ -1,93 +1,86 @@
 #include <Arduino.h>
 #include <PS4Controller.h>
-#include "CytronMotorDriver.h"
-#include <math.h>
+#include <Cytron_SmartDriveDuo.h>
 
+#define IN1 32
+#define BAUDRATE 115200
 #define LED_PIN 2
+#define PS4_ADDR "00:B8:15:F7:39:82"
 
-/*
- IN1: DigitalSignal(Direction:DIR) for motor LEFT 回転方向
- IN2: DigitalSignal(Direction:DIR) for motor RIGHT 回転方向
- AN1: AnalogSignal(Speed:PWM) for motor LEFT 回転速度
- AN2: AnalogSignal(Speed:PWM) for motor RIGHT 回転速度
-*/
+signed int speedLeft_F, speedRight_F;
+signed int speedLeft_R, speedRight_R;
 
 float sin_45 = 0.7071;
 float cos_45 = 0.7071;
 double length = 0.5; // ロボットの車輪間距離(m)
-double rad_sec = 0; // 角速度(rad/s)
-int n = 100; // 速度の倍率
+double rad_sec = 0; // 角速度(rad/s) 今後，回転する操作を付け加えるときに使う
+int n = 100; // 速度の出力倍率(%) この値を実験で決める
 
-// モータのインスタンス化 (モータのピン番号を指定)
-CytronMD motorLF(PWM_DIR, 32, 33);  // PWM: Analog, DIR: Digital
-CytronMD motorRF(PWM_DIR, 25, 26); 
-CytronMD motorLB(PWM_DIR, 27, 14);
-CytronMD motorRB(PWM_DIR, 12, 13);
+// FrontLR DIP: 111-000-00
+Cytron_SmartDriveDuo motorFrontLR(SERIAL_PACKETIZED, IN1, 0, BAUDRATE);
+// FrontRL DIP: 111-001-00
+Cytron_SmartDriveDuo motorRearLR(SERIAL_PACKETIZED, IN1, 1, BAUDRATE);
 
-// 4輪オムニの制御関数
-void FourWheelOmniControl() {
-  // PS4コントローラからの入力を取得
-  double lstick_x = PS4.LStickX(); // 左スティックのX軸 -127~127
-  double lstick_y = PS4.LStickY(); // 左スティックのY軸 -127~127
+void FourWheelOmniControl(){
+    double lstick_x = PS4.LStickX(); // -127 to 127
+    double lstick_y = PS4.LStickY(); // -127 to 127
 
-  // ドリフトを考慮して，0-5の誤差を許容
-  if (lstick_x > -5 && lstick_x < 5) {
-    lstick_x = 0;
-  }
-  if (lstick_y > -5 && lstick_y < 5) {
-    lstick_y = 0;
-  }
+    if (lstick_x > -12.7 && lstick_x < 12.7){
+        lstick_x = 0;
+    }
+    if (lstick_y > -12.7 && lstick_y < 12.7){
+        lstick_y = 0;
+    }
 
-  // -127~127の範囲を-1.5~1.5に変換 (1.5は最大速度[m/s])
-  lstick_x = lstick_x / 85.333;
-  lstick_y = lstick_y / 85.333;
+    // -127 to 127 -> -1.5 to 1.5
+    lstick_x = lstick_x / 85.333;
+    lstick_y = lstick_y / 85.333;
 
-  Serial.println("lstick_x: " + String(lstick_x));
-  Serial.println("lstick_y: " + String(lstick_y));
+    double front_right_speed = lstick_x*(-sin_45) + lstick_y*cos_45 + rad_sec*length;
+    double front_left_speed = lstick_x*(-cos_45) + lstick_y*(-sin_45) + rad_sec*length;
+    double rear_left_speed = lstick_x*sin_45 + lstick_y*(-cos_45) + rad_sec*length;
+    double rear_right_speed = lstick_x*cos_45 + lstick_y*sin_45 + rad_sec*length;
 
-  // モータの速度を計算
-  double front_right_speed = lstick_x*(-sin_45) + lstick_y*cos_45 + rad_sec*length;
-  double front_left_speed = stick_x*(-cos_45) + lstick_y*(-sin_45) + rad_sec*length;
-  double rear_left_speed = lstick_x*sin_45 + lstick_y*(-cos_45) + rad_sec*length;
-  double rear_right_speed = lstick_x*cos_45 + lstick_y*sin_45 + rad_sec*length;
+    Serial.println("出力倍率: " + String(n) + "%");
+    Serial.println("front_left_speed: " + String(front_left_speed) + "[m/s]");
+    Serial.println("front_right_speed: " + String(front_right_speed) + "[m/s]");
+    Serial.println("rear_left_speed: " + String(rear_left_speed) + "[m/s]");
+    Serial.println("rear_right_speed: " + String(rear_right_speed) + "[m/s]");
 
-  // モーターに速度を指令 (速度は-255~255の範囲で指定)
-  motorLF.setSpeed(int(front_left_speed * n)); 
-  motorRF.setSpeed(int(front_right_speed * n));
-  motorLB.setSpeed(int(rear_left_speed * n));
-  motorRB.setSpeed(int(rear_right_speed * n));
+    // -1.5 to 1.5 -> -100 to 100 (n倍率)
+    // 100/1.5 = 66.666
+    speedLeft_F = front_left_speed * 66.666 * n / 100;
+    speedRight_F = front_right_speed * 66.666 * n / 100;
+    speedLeft_R = rear_left_speed * 66.666 * n / 100;
+    speedRight_R = rear_right_speed * 66.666 * n / 100;
 
-  Serial.println("front_right_speed: " + String(front_right_speed) + "[m/s]");
-  Serial.println("front_left_speed: " + String(front_left_speed) + "[m/s]");
-  Serial.println("rear_left_speed: " + String(rear_left_speed) + "[m/s]");
-  Serial.println("rear_right_speed: " + String(rear_right_speed) + "[m/s]");
-  Serial.println();
+    motorFrontLR.control(speedLeft_F, speedRight_F);
+    motorRearLR.control(speedLeft_R, speedRight_R);
 }
 
 void setup() {
-  Serial.begin(115200);
-  pinMode(LED_PIN, OUTPUT);
-  // PS4コントローラの初期化
-  PS4.begin("60:8C:4A:71:05:E2"); 
-  Serial.println("Ready.");
-  while (!PS4.isConnected()) {}
-  Serial.println("Connected.");
-  delay(1000);
+    Serial.begin(115200);
+    motorFrontLR.initialByte(0x80);
+    motorRearLR.initialByte(0x80);
+    pinMode(LED_PIN, OUTPUT);
+    PS4.begin(PS4_ADDR);
+    Serial.println("PS4 Controller Ready!");
+    Serial.println("Press PS button to start");
+    while(!PS4.isConnected()){}
+    Serial.println("PS4 Controller Connected!");
+    delay(1000);
 }
 
-void loop() {
-  if (PS4.LatestPacket()){
-    digitalWrite(LED_PIN, HIGH); // LEDを点灯
-    FourWheelOmniControl();
-    delay(100);
-  } else {
-    digitalWrite(LED_PIN, LOW); // LEDを消灯
-    delay(100);
-  }
-}
+// control(signed int motorLSpeed, signed int motorRSpeed)
+// motorLSpeed: -100 to 100, motorRSpeed: -100 to 100
 
-/*
-白：0C:B8:15:D8:64:76
-青：00:B8:15:F7:39:82
-黒：60:8C:4A:71:05:E2
-*/
+void loop(){
+    if (PS4.LatestPacket()){
+        digitalWrite(LED_PIN, HIGH);
+        FourWheelOmniControl();
+        delay(100);
+    } else {
+        digitalWrite(LED_PIN, LOW);
+        delay(100);
+    }
+}
